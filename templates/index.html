@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supply Chain Optimizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js">
+function saveAlert(){
+  const email=document.getElementById('alertEmail').value.trim();
+  const supplier=document.getElementById('alertSupplier').value.trim();
+  const threshold=document.getElementById('alertThreshold').value||30;
+  const commodity=document.getElementById('commoditySelect').value;
+  if(!email){alert('Please enter your email');return;}
+  fetch('/alert',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email,supplier,commodity,threshold:parseFloat(threshold)})})
+    .then(r=>r.json())
+    .then(d=>{
+      const el=document.getElementById('alertSuccess');
+      el.textContent='✅ '+d.message;
+      el.style.display='block';
+      setTimeout(()=>{el.style.display='none';},5000);
+    })
+    .catch(()=>alert('Error saving alert'));
+}
+</script>
+<style>
+  :root{--ocean:#c5ddf2;--land:#b2d4a4;--land-stroke:#82b074;--ink:#0f1f2e;--ink2:#2c4a63;--muted:#7a95a8;--border:#d8e6f0;--white:#ffffff;--navy:#0d2b45;--blue:#1565c0;--green:#166534;--amber:#b45309;--red:#991b1b;--shadow-lg:0 12px 40px rgba(0,0,0,0.13);--r:10px;}
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Outfit',sans-serif;background:var(--ocean);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  nav{height:56px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 28px;flex-shrink:0;z-index:1000;box-shadow:0 2px 12px rgba(0,0,0,0.25);}
+  .nav-brand{font-family:'Cormorant Garamond',serif;font-size:20px;color:#fff;display:flex;align-items:center;gap:10px;}
+  .nav-dot{width:8px;height:8px;background:#4ade80;border-radius:50%;animation:blink 2s ease infinite;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
+  .nav-brand em{font-style:italic;color:#7dd3fc;}
+  .nav-pills{display:flex;align-items:center;gap:6px;}
+  .pill{font-size:10.5px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;padding:4px 11px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:5px;}
+  .pill-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+  .layout{display:grid;grid-template-columns:320px 1fr;flex:1;overflow:hidden;}
+
+  .sidebar{background:var(--white);display:flex;flex-direction:column;overflow:hidden;box-shadow:4px 0 20px rgba(0,0,0,0.08);z-index:100;border-right:1px solid var(--border);}
+  .sb-hero{background:linear-gradient(135deg,var(--navy) 0%,#1a3a5c 100%);padding:22px 22px 18px;flex-shrink:0;position:relative;overflow:hidden;}
+  .sb-hero::after{content:'';position:absolute;right:-20px;top:-20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.04);}
+  .sb-eyebrow{font-size:9.5px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#7dd3fc;margin-bottom:6px;}
+  .sb-title{font-family:'Cormorant Garamond',serif;font-size:22px;color:#fff;line-height:1.2;margin-bottom:4px;}
+  .sb-title em{font-style:italic;color:#bae6fd;}
+  .sb-desc{font-size:11.5px;color:rgba(255,255,255,0.45);line-height:1.5;font-weight:300;}
+  .sb-body{flex:1;overflow-y:auto;padding:18px 20px 22px;display:flex;flex-direction:column;gap:13px;}
+  .sb-body::-webkit-scrollbar{width:3px;}
+  .sb-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  .field-label{font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink2);margin-bottom:5px;display:flex;align-items:center;gap:6px;}
+  .field-label::after{content:'';flex:1;height:1px;background:var(--border);}
+  .sel-wrap{position:relative;}
+  select{width:100%;background:#f8fbfd;border:1.5px solid var(--border);color:var(--ink);font-family:'Outfit',sans-serif;font-size:14px;padding:11px 36px 11px 13px;border-radius:var(--r);appearance:none;cursor:pointer;outline:none;transition:all 0.15s;}
+  select:focus{border-color:var(--blue);background:var(--white);box-shadow:0 0 0 3px rgba(21,101,192,0.1);}
+  .sel-wrap::after{content:'';position:absolute;right:13px;top:50%;transform:translateY(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--muted);pointer-events:none;margin-top:2px;}
+
+  .btn{width:100%;background:linear-gradient(135deg,var(--navy) 0%,#1e4976 100%);color:#fff;border:none;border-radius:var(--r);font-family:'Outfit',sans-serif;font-size:13.5px;font-weight:500;padding:13px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:9px;}
+  .btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(13,43,69,0.4);}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .btn-icon{font-size:15px;transition:transform 0.3s;}
+  .btn:hover:not(:disabled) .btn-icon{transform:translateX(3px);}
+  .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.65s linear infinite;display:none;}
+  .btn.loading .spinner{display:block;}
+  .btn.loading .btn-icon{display:none;}
+
+  .legend{background:#f8fbfd;border:1.5px solid var(--border);border-radius:var(--r);padding:13px 15px;}
+  .legend-title{font-size:10.5px;font-weight:600;color:var(--ink2);margin-bottom:9px;}
+  .legend-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .leg-item{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink2);}
+  .leg-pulse{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .leg-pulse--best{background:var(--navy);}
+  .leg-pulse--dest{background:var(--green);}
+  .leg-pulse--other{background:var(--blue);opacity:0.7;}
+  .leg-line-box{width:26px;height:2px;flex-shrink:0;}
+
+  .err-msg{font-size:12px;color:var(--red);background:#fff5f5;border:1px solid #fecaca;border-radius:7px;padding:9px 12px;display:none;}
+
+  .results{display:none;}
+  .results.show{display:flex;flex-direction:column;gap:13px;animation:fadeUp 0.4s ease;}
+  .sec-label{font-size:9.5px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:7px;}
+  .sec-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+  .best-card{background:linear-gradient(135deg,#e8f4fd 0%,#dceefb 100%);border:1.5px solid #93c5fd;border-radius:var(--r);padding:15px 16px;position:relative;overflow:hidden;}
+  .best-card::before{content:'★ BEST OPTION';position:absolute;top:10px;right:12px;font-size:8.5px;font-weight:700;letter-spacing:0.1em;color:var(--blue);background:rgba(255,255,255,0.75);padding:2px 7px;border-radius:20px;}
+  .best-top{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
+  .best-flag{font-size:28px;line-height:1;}
+  .best-name{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--navy);line-height:1.1;}
+  .best-tag{font-size:10px;color:var(--blue);text-transform:uppercase;letter-spacing:0.1em;font-weight:500;}
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+  .metric{background:var(--white);border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;}
+  .metric-val{font-size:16px;font-weight:600;color:var(--navy);}
+  .metric-val.green{color:var(--green);}
+  .metric-lbl{font-size:10px;color:var(--muted);margin-top:1px;}
+
+  .dest-badge{display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:500;color:var(--green);margin-bottom:8px;}
+
+  .route-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);padding:13px 15px;}
+  .route-stops{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:7px;}
+  .stop{font-size:11.5px;font-weight:500;padding:4px 11px;border-radius:20px;}
+  .stop.origin{background:var(--navy);color:#fff;}
+  .stop.hub{background:var(--amber);color:#fff;}
+  .stop.dest{background:var(--green);color:#fff;}
+  .arr{font-size:14px;color:var(--muted);}
+
+  .table-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;}
+  table{width:100%;border-collapse:collapse;}
+  thead{background:#f1f7fb;}
+  th{font-size:9px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);padding:9px 11px;text-align:left;border-bottom:1px solid var(--border);}
+  td{padding:8px 11px;font-size:12px;color:var(--ink2);border-bottom:1px solid #f0f6fb;}
+  tr:last-child td{border-bottom:none;}
+  tr.winner td{background:linear-gradient(90deg,#e8f4fd 0%,#f0f9ff 100%);color:var(--navy);font-weight:500;}
+  tr.winner td:first-child{border-left:3px solid var(--blue);}
+  tr:not(.winner):hover td{background:#f8fbfd;}
+
+  #map{width:100%;height:100%;background:var(--ocean);}
+  .leaflet-container{font-family:'Outfit',sans-serif!important;background:var(--ocean)!important;}
+  .leaflet-popup-content-wrapper{border-radius:12px!important;box-shadow:var(--shadow-lg)!important;border:1px solid var(--border);padding:0!important;overflow:hidden;}
+  .leaflet-popup-content{margin:0!important;min-width:200px;}
+  .leaflet-popup-tip{background:#fff!important;}
+  .leaflet-tooltip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important;}
+  .map-lbl{background:rgba(255,255,255,0.92);border-radius:5px;padding:3px 8px;font-family:'Outfit',sans-serif;font-size:10.5px;line-height:1.45;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);}
+  .map-wm{position:absolute;bottom:10px;left:10px;z-index:999;font-size:10px;color:var(--navy);background:rgba(255,255,255,0.75);padding:3px 10px;border-radius:20px;font-weight:500;pointer-events:none;}
+
+  .pu{padding:14px 16px;}
+  .pu-badge{display:inline-block;background:var(--navy);color:#fff;font-size:8.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:2px 9px;border-radius:20px;margin-bottom:9px;}
+  .pu-dest-badge{display:inline-block;background:var(--green);color:#fff;font-size:8.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:2px 9px;border-radius:20px;margin-bottom:9px;}
+  .pu-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .pu-flag{font-size:22px;line-height:1;}
+  .pu-name{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:var(--ink);}
+  .pu-rows{display:flex;flex-direction:column;gap:5px;}
+  .pu-row{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px;}
+  .pu-key{color:var(--muted);font-size:11px;}
+  .pu-val{font-weight:500;color:var(--ink);}
+  .pu-val.best{color:var(--navy);font-size:13px;font-weight:600;}
+
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes pulseRing{0%{transform:scale(1);opacity:0.7;}100%{transform:scale(2.6);opacity:0;}}
+  @keyframes pulseRingSlow{0%{transform:scale(1);opacity:0.4;}100%{transform:scale(3.2);opacity:0;}}
+  @keyframes destPulse{0%{transform:scale(1);opacity:0.8;}100%{transform:scale(3.5);opacity:0;}}
+
+  /* ── New feature styles ── */
+  .fx-badge{display:inline-flex;align-items:center;gap:5px;background:#fffbeb;border:1px solid #fde68a;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:500;color:#92400e;margin-top:4px;}
+  .fx-live{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:blink 1.5s ease infinite;flex-shrink:0;}
+  .delivery-card{background:#f0fdf4;border:1.5px solid #86efac;border-radius:var(--r);padding:13px 15px;}
+  .delivery-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+  .delivery-item{background:var(--white);border:1px solid #bbf7d0;border-radius:7px;padding:9px 11px;}
+  .delivery-val{font-size:13px;font-weight:600;color:var(--green);}
+  .delivery-lbl{font-size:10px;color:var(--muted);margin-top:1px;}
+  .alert-card{background:#fafafa;border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;}
+  .alert-title{font-size:11px;font-weight:600;color:var(--ink2);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .alert-title::before{content:'🔔';font-size:13px;}
+  .alert-input{width:100%;background:#f8fbfd;border:1.5px solid var(--border);color:var(--ink);font-family:'Outfit',sans-serif;font-size:13px;padding:9px 12px;border-radius:8px;outline:none;transition:all 0.15s;margin-bottom:7px;}
+  .alert-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(21,101,192,0.1);}
+  .alert-row{display:grid;grid-template-columns:1fr 80px;gap:7px;margin-bottom:7px;}
+  .alert-btn{width:100%;background:var(--green);color:#fff;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:500;padding:9px;cursor:pointer;transition:all 0.15s;}
+  .alert-btn:hover{background:#15803d;transform:translateY(-1px);}
+  .alert-success{font-size:11px;color:var(--green);background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:8px 10px;display:none;margin-top:6px;}
+  .local-cost{font-size:11px;color:var(--blue);font-weight:500;margin-top:2px;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand"><div class="nav-dot"></div>Supply<em>Chain</em> Optimizer</div>
+  <div class="nav-pills">
+    <div class="pill"><div class="pill-dot" style="background:#4ade80"></div>Best Supplier</div>
+    <div class="pill"><div class="pill-dot" style="background:#60a5fa"></div>Suppliers</div>
+    <div class="pill"><div class="pill-dot" style="background:#fbbf24"></div>Transit Hub</div>
+    <div class="pill"><div class="pill-dot" style="background:#86efac"></div>Destination</div>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sb-hero">
+      <div class="sb-eyebrow">ML-Powered · Live FX · 185 Countries</div>
+      <div class="sb-title">Global Import<br><em>Route Optimizer</em></div>
+      <div class="sb-desc">Real ML predictions · Live exchange rates · Delivery date forecasting.</div>
+    </div>
+
+    <div class="sb-body">
+
+      <div>
+        <div class="field-label">Destination Country</div>
+        <div class="sel-wrap">
+          <select id="destinationSelect">
+            <option value="">Choose destination…</option>
+            {% for d in destinations %}
+            <option value="{{ d }}" {% if d == 'United States' %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <div class="field-label">Commodity</div>
+        <div class="sel-wrap">
+          <select id="commoditySelect">
+            <option value="">Choose a commodity…</option>
+            {% for c in commodities %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="err-msg" id="errMsg">⚠ Please select both a destination and commodity.</div>
+
+      <button class="btn" id="runBtn" onclick="runOpt()">
+        <div class="spinner"></div>
+        <span>Optimize Supply Chain</span>
+        <span class="btn-icon">→</span>
+      </button>
+
+      <div class="legend">
+        <div class="legend-title">Map Legend</div>
+        <div class="legend-grid">
+          <div class="leg-item"><div class="leg-pulse leg-pulse--best"></div>Best supplier</div>
+          <div class="leg-item"><div class="leg-pulse leg-pulse--dest"></div>Destination</div>
+          <div class="leg-item"><div class="leg-pulse leg-pulse--other"></div>Other suppliers</div>
+          <div class="leg-item"><div class="leg-line-box" style="border-top:2px dashed var(--navy);"></div>Optimal route</div>
+          <div class="leg-item"><div class="leg-line-box" style="border-top:1.5px dashed #94a3b8;"></div>Other routes</div>
+        </div>
+      </div>
+
+      <div class="results" id="results">
+        <div>
+          <div class="sec-label">Best Supplier</div>
+          <div class="best-card">
+            <div class="dest-badge">📍 <span id="rDestination">—</span></div>
+            <div class="best-top">
+              <div class="best-flag" id="rFlag">🌍</div>
+              <div>
+                <div class="best-name" id="rSupplier">—</div>
+                <div class="best-tag" id="rCommodity">—</div>
+              </div>
+            </div>
+            <div class="metrics">
+              <div class="metric">
+                <div class="metric-val green" id="rCost">—</div>
+                <div class="local-cost" id="rLocalCost"></div>
+                <div class="metric-lbl">Total Landed Cost</div>
+              </div>
+              <div class="metric">
+                <div class="metric-val" id="rTime">—</div>
+                <div class="metric-lbl">Est. Delivery</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec-label">Shipping Route</div>
+          <div class="route-card">
+            <div class="route-stops" id="routeStops"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec-label">Estimated Arrival</div>
+          <div class="delivery-card">
+            <div style="font-size:11px;color:var(--green);font-weight:500;margin-bottom:2px;">📅 Delivery Forecast</div>
+            <div class="delivery-grid">
+              <div class="delivery-item">
+                <div class="delivery-val" id="dDeparture">—</div>
+                <div class="delivery-lbl">Departs today</div>
+              </div>
+              <div class="delivery-item">
+                <div class="delivery-val" id="dArrival">—</div>
+                <div class="delivery-lbl" id="dDayLabel">Arrives</div>
+              </div>
+              <div class="delivery-item">
+                <div class="delivery-val" id="dTransit">—</div>
+                <div class="delivery-lbl">Transit days</div>
+              </div>
+              <div class="delivery-item">
+                <div class="delivery-val" id="dBuffer">—</div>
+                <div class="delivery-lbl">Port processing</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec-label">Set Tariff Alert</div>
+          <div class="alert-card">
+            <div class="alert-title">Alert me when tariffs spike</div>
+            <input class="alert-input" id="alertEmail" type="email" placeholder="your@email.com"/>
+            <div class="alert-row">
+              <input class="alert-input" id="alertSupplier" placeholder="Supplier (e.g. China)" style="margin-bottom:0"/>
+              <input class="alert-input" id="alertThreshold" type="number" placeholder="%" value="30" style="margin-bottom:0"/>
+            </div>
+            <button class="alert-btn" onclick="saveAlert()">🔔 Save Alert</button>
+            <div class="alert-success" id="alertSuccess"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec-label">All Suppliers — Ranked</div>
+          <div class="table-card">
+            <table>
+              <thead><tr><th>Country</th><th>Landed $</th><th>Tariff</th><th>Days</th></tr></thead>
+              <tbody id="tBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div style="position:relative;overflow:hidden;">
+    <div id="map"></div>
+    <div class="map-wm">Supply Chain Optimizer · ML-Powered · 185 Destinations</div>
+  </div>
+</div>
+
+<script>
+const FLAGS={China:"🇨🇳",India:"🇮🇳",Germany:"🇩🇪",Brazil:"🇧🇷","South Korea":"🇰🇷",Taiwan:"🇹🇼",Japan:"🇯🇵",Vietnam:"🇻🇳",Italy:"🇮🇹",Bangladesh:"🇧🇩",Turkey:"🇹🇷",Netherlands:"🇳🇱","Saudi Arabia":"🇸🇦",Mexico:"🇲🇽",Argentina:"🇦🇷",Thailand:"🇹🇭",Canada:"🇨🇦",Indonesia:"🇮🇩",Malaysia:"🇲🇾","United Kingdom":"🇬🇧","United States":"🇺🇸",Australia:"🇦🇺",France:"🇫🇷",Russia:"🇷🇺","South Africa":"🇿🇦",Egypt:"🇪🇬",Nigeria:"🇳🇬",Pakistan:"🇵🇰","New Zealand":"🇳🇿",Singapore:"🇸🇬","United Arab Emirates":"🇦🇪",Qatar:"🇶🇦",Kuwait:"🇰🇼",Israel:"🇮🇱",Switzerland:"🇨🇭",Norway:"🇳🇴",Sweden:"🇸🇪",Denmark:"🇩🇰"};
+
+const GEO={"Afghanistan":[33.93,67.71],"Albania":[41.15,20.17],"Algeria":[28.03,1.66],"Andorra":[42.55,1.57],"Angola":[-11.2,17.87],"Anguilla":[18.22,-63.05],"Antigua and Barbuda":[17.06,-61.8],"Argentina":[-38.42,-63.62],"Armenia":[40.07,45.04],"Aruba":[12.52,-69.98],"Australia":[-25.27,133.78],"Azerbaijan":[40.14,47.58],"Bahamas":[25.03,-77.4],"Bahrain":[26.0,50.55],"Bangladesh":[23.68,90.36],"Barbados":[13.19,-59.54],"Belize":[17.19,-88.5],"Benin":[9.31,2.32],"Bermuda":[32.32,-64.76],"Bhutan":[27.51,90.43],"Bolivia":[-16.29,-63.59],"Bosnia and Herzegovina":[43.92,17.68],"Botswana":[-22.33,24.68],"Brazil":[-14.24,-51.93],"British Indian Ocean Territory":[-6.34,71.88],"British Virgin Islands":[18.42,-64.64],"Brunei":[4.54,114.73],"Burundi":[-3.37,29.92],"Cabo Verde":[16.0,-24.01],"Cambodia":[12.57,104.99],"Cameroon":[3.85,11.5],"Cayman Islands":[19.31,-81.25],"Central African Republic":[6.61,20.94],"Chad":[15.45,18.73],"Chile":[-35.68,-71.54],"China":[35.86,104.19],"Christmas Island":[-10.45,105.69],"Cocos (Keeling) Islands":[-12.19,96.83],"Colombia":[4.57,-74.3],"Comoros":[-11.64,43.33],"Cook Islands":[-21.24,-159.78],"Costa Rica":[9.75,-83.75],"Curacao":[12.17,-69.0],"Cote d'Ivoire":[7.54,-5.55],"Democratic Republic of the Congo":[-4.04,21.76],"Djibouti":[11.83,42.59],"Dominica":[15.41,-61.37],"Dominican Republic":[18.74,-70.16],"Ecuador":[-1.83,-78.18],"Egypt":[26.82,30.8],"El Salvador":[13.79,-88.9],"Equatorial Guinea":[1.65,10.27],"Eritrea":[15.18,39.78],"Eswatini":[-26.52,31.47],"Ethiopia":[9.15,40.49],"European Union":[50.85,4.36],"Falkland Islands":[-51.8,-59.52],"Fiji":[-17.71,178.07],"French Guiana":[3.93,-53.13],"French Polynesia":[-17.68,-149.41],"Gabon":[-0.8,11.61],"Gambia":[13.44,-15.31],"Georgia":[42.32,43.36],"Ghana":[7.95,-1.02],"Gibraltar":[36.14,-5.35],"Grenada":[12.12,-61.68],"Guadeloupe":[16.99,-62.07],"Guatemala":[15.78,-90.23],"Guinea":[11.75,-15.18],"Guinea-Bissau":[11.8,-15.18],"Guyana":[4.86,-58.93],"Haiti":[18.97,-72.29],"Heard and McDonald Islands":[-53.08,73.5],"Honduras":[15.2,-86.24],"Iceland":[64.96,-19.02],"India":[20.59,78.96],"Indonesia":[-0.79,113.92],"Iran":[32.43,53.69],"Iraq":[33.22,43.68],"Israel":[31.05,34.85],"Jamaica":[18.11,-77.3],"Japan":[36.2,138.25],"Jordan":[30.59,36.24],"Kazakhstan":[48.02,66.92],"Kenya":[-0.02,37.91],"Kiribati":[-3.37,-168.73],"Kosovo":[42.6,20.9],"Kuwait":[29.34,47.49],"Kyrgyzstan":[41.2,74.77],"Laos":[19.86,102.5],"Lebanon":[33.85,35.86],"Lesotho":[-29.61,28.23],"Liberia":[6.43,-9.43],"Libya":[26.34,17.23],"Liechtenstein":[47.14,9.56],"Madagascar":[-18.77,46.87],"Malawi":[-13.25,34.3],"Malaysia":[4.21,101.98],"Maldives":[3.2,73.22],"Mali":[17.57,-3.99],"Marshall Islands":[7.13,171.18],"Martinique":[14.64,-61.02],"Mauritania":[21.01,-10.94],"Mauritius":[-20.35,57.55],"Mayotte":[-12.83,45.17],"Micronesia":[6.89,158.19],"Moldova":[47.41,28.37],"Monaco":[43.73,7.41],"Mongolia":[46.86,103.85],"Montenegro":[42.71,19.37],"Montserrat":[16.74,-62.19],"Morocco":[31.79,-7.09],"Mozambique":[-18.67,35.53],"Myanmar (Burma)":[21.92,95.96],"Namibia":[-22.96,18.49],"Nauru":[-0.53,166.92],"Nepal":[28.39,84.12],"New Zealand":[-40.9,174.89],"Nicaragua":[12.86,-85.21],"Niger":[17.61,8.08],"Nigeria":[9.08,8.68],"Norfolk Island":[-29.04,167.95],"North Macedonia":[41.61,21.75],"Norway":[60.47,8.47],"Oman":[21.51,55.92],"Pakistan":[30.38,69.35],"Panama":[8.54,-80.78],"Papua New Guinea":[-6.31,143.96],"Paraguay":[-23.44,-58.44],"Peru":[-9.19,-75.02],"Philippines":[12.88,121.77],"Qatar":[25.35,51.18],"Republic of the Congo":[-0.23,15.83],"Reunion":[-21.11,55.54],"Rwanda":[-1.94,29.87],"Saint Helena":[-15.96,-5.72],"Saint Kitts and Nevis":[17.36,-62.78],"Saint Lucia":[13.91,-60.98],"Saint Pierre and Miquelon":[46.88,-56.32],"Saint Vincent and the Grenadines":[12.98,-61.29],"Samoa":[-13.76,-172.1],"San Marino":[43.94,12.46],"Sao Tome and Principe":[0.19,6.61],"Saudi Arabia":[23.89,45.08],"Senegal":[14.5,-14.45],"Serbia":[44.02,21.01],"Sierra Leone":[8.46,-11.78],"Singapore":[1.35,103.82],"Sint Maarten":[18.04,-63.07],"Solomon Islands":[-9.64,160.16],"South Africa":[-30.56,22.94],"South Korea":[35.91,127.77],"South Sudan":[7.87,29.97],"Sri Lanka":[7.87,80.77],"Sudan":[12.86,30.22],"Suriname":[3.92,-56.03],"Svalbard and Jan Mayen":[77.55,23.67],"Switzerland":[46.82,8.23],"Syria":[34.8,38.99],"Taiwan":[23.7,121.0],"Tajikistan":[38.86,71.28],"Tanzania":[-6.37,34.89],"Thailand":[15.87,100.99],"Timor-Leste":[-8.87,125.73],"Togo":[8.62,0.82],"Tokelau":[-9.0,-171.84],"Tonga":[-21.18,-175.2],"Trinidad and Tobago":[10.69,-61.22],"Tunisia":[33.89,9.54],"Turkey":[38.96,35.24],"Turkmenistan":[38.97,59.56],"Turks and Caicos Islands":[21.69,-71.8],"Tuvalu":[-7.11,177.64],"Uganda":[1.37,32.29],"Ukraine":[48.38,31.17],"United Arab Emirates":[23.42,53.85],"United Kingdom":[55.38,-3.44],"Uruguay":[-32.52,-55.77],"Uzbekistan":[41.38,64.59],"Vanuatu":[-15.38,166.96],"Venezuela":[6.42,-66.59],"Vietnam":[14.06,108.28],"Yemen":[15.55,48.52],"Zambia":[-13.13,27.85],"Zimbabwe":[-19.02,29.15],"Rotterdam":[51.92,4.48],"Dubai":[25.2,55.27],"Johannesburg":[-26.2,28.04],"Panama City":[8.99,-79.52],"Los Angeles":[34.05,-118.24],"Sydney":[-33.87,151.21],"United States":[37.09,-95.71]};
+
+let map=null,layers=[];
+
+function gcPoints(lat1,lng1,lat2,lng2,n=80){
+  const R=d=>d*Math.PI/180,D=r=>r*180/Math.PI,pts=[];
+  const[la1,lo1,la2,lo2]=[R(lat1),R(lng1),R(lat2),R(lng2)];
+  const d=2*Math.asin(Math.sqrt(Math.sin((la2-la1)/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2));
+  for(let i=0;i<=n;i++){const f=i/n;if(d===0){pts.push([lat1,lng1]);continue;}const A=Math.sin((1-f)*d)/Math.sin(d),B=Math.sin(f*d)/Math.sin(d);const x=A*Math.cos(la1)*Math.cos(lo1)+B*Math.cos(la2)*Math.cos(lo2);const y=A*Math.cos(la1)*Math.sin(lo1)+B*Math.cos(la2)*Math.sin(lo2);const z=A*Math.sin(la1)+B*Math.sin(la2);pts.push([D(Math.atan2(z,Math.sqrt(x*x+y*y))),D(Math.atan2(y,x))]);}
+  return pts;
+}
+
+function clearLayers(){layers.forEach(l=>{try{map.removeLayer(l);}catch(e){}});layers=[];}
+
+function initMap(){
+  if(map)return;
+  map=L.map('map',{center:[20,15],zoom:2,zoomControl:true,scrollWheelZoom:true,minZoom:1.5,maxZoom:7,attributionControl:false});
+  map.getContainer().style.background='#c5ddf2';
+  fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson')
+    .then(r=>r.json())
+    .then(data=>{L.geoJSON(data,{style:{fillColor:'#b2d4a4',fillOpacity:1,color:'#82b074',weight:0.8}}).addTo(map);})
+    .catch(()=>{L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19}).addTo(map);});
+}
+
+document.addEventListener('DOMContentLoaded',()=>initMap());
+
+function makePulseIcon(type){
+  const cfg={
+    best:{core:'#0d2b45',size:14,total:56,dur1:'1.6s',dur2:'2.4s'},
+    dest:{core:'#166534',size:16,total:60,dur1:'1.4s',dur2:'2.2s'},
+    other:{core:'#1565c0',size:10,total:44,dur1:'2s',dur2:'3s'},
+    hub:{core:'#b45309',size:12,total:48,dur1:'2.5s',dur2:'3.5s'},
+  }[type]||{core:'#1565c0',size:10,total:44,dur1:'2s',dur2:'3s'};
+  return L.divIcon({
+    className:'',iconSize:[cfg.total,cfg.total],iconAnchor:[cfg.total/2,cfg.total/2],popupAnchor:[0,-cfg.total/2-4],
+    html:`<div style="position:relative;width:${cfg.total}px;height:${cfg.total}px;display:flex;align-items:center;justify-content:center;">
+      <div style="position:absolute;width:${cfg.size}px;height:${cfg.size}px;border-radius:50%;background:${cfg.core};animation:pulseRing ${cfg.dur1} ease-out infinite;"></div>
+      <div style="position:absolute;width:${cfg.size}px;height:${cfg.size}px;border-radius:50%;background:${cfg.core};animation:pulseRingSlow ${cfg.dur2} ease-out infinite 0.4s;"></div>
+      <div style="position:relative;width:${cfg.size}px;height:${cfg.size}px;border-radius:50%;background:${cfg.core};border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);z-index:2;"></div>
+    </div>`
+  });
+}
+
+function runOpt(){
+  const commodity=document.getElementById('commoditySelect').value;
+  const destination=document.getElementById('destinationSelect').value;
+  const errEl=document.getElementById('errMsg');
+  if(!commodity||!destination){errEl.style.display='block';return;}
+  errEl.style.display='none';
+  const btn=document.getElementById('runBtn');
+  btn.classList.add('loading');btn.disabled=true;
+  fetch('/optimize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({commodity,destination})})
+    .then(r=>r.json())
+    .then(data=>{if(data.error){alert(data.error);return;}renderSidebar(commodity,data);renderMap(data);})
+    .catch(e=>{alert('Server error: '+e);})
+    .finally(()=>{btn.classList.remove('loading');btn.disabled=false;});
+}
+
+function renderSidebar(commodity,data){
+  document.getElementById('rFlag').textContent=FLAGS[data.best_supplier]||'🌍';
+  document.getElementById('rSupplier').textContent=data.best_supplier;
+  document.getElementById('rCommodity').textContent=commodity;
+  document.getElementById('rCost').textContent='$'+data.landed_cost.toFixed(2);
+  document.getElementById('rTime').textContent=data.delivery_time+' days';
+  document.getElementById('rDestination').textContent=(FLAGS[data.destination]||'')+'  '+data.destination;
+
+  const stopsEl=document.getElementById('routeStops');stopsEl.innerHTML='';
+  data.best_route.forEach((node,i)=>{
+    const s=document.createElement('span'),last=data.best_route.length-1;
+    s.className='stop '+(i===0?'origin':i===last?'dest':'hub');s.textContent=node;stopsEl.appendChild(s);
+    if(i<last){const a=document.createElement('span');a.className='arr';a.textContent='›';stopsEl.appendChild(a);}
+  });
+
+  const best={};
+  data.all_suppliers.forEach(r=>{if(!best[r.country]||r.landed_cost<best[r.country].landed_cost)best[r.country]=r;});
+  const rows=Object.values(best).sort((a,b)=>a.landed_cost-b.landed_cost);
+  const tbody=document.getElementById('tBody');tbody.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    if(r.country===data.best_supplier)tr.className='winner';
+    tr.innerHTML=`<td>${(FLAGS[r.country]||'')} ${r.country}</td><td>$${r.landed_cost.toFixed(2)}</td><td>${r.tariff}%</td><td>${r.delivery_time}d</td>`;
+    tbody.appendChild(tr);
+  });
+  // Delivery date
+  if(data.delivery_info){
+    const d=data.delivery_info;
+    document.getElementById('dDeparture').textContent=d.departure_date;
+    document.getElementById('dArrival').textContent=d.arrival_date;
+    document.getElementById('dDayLabel').textContent='Arrives ('+d.day_of_week+')';
+    document.getElementById('dTransit').textContent=d.transit_days+' days';
+    document.getElementById('dBuffer').textContent=d.buffer_days+' days';
+  }
+
+  // Local currency
+  const localEl=document.getElementById('rLocalCost');
+  if(data.landed_local && data.currency_code && data.currency_code!=='USD'){
+    localEl.textContent='≈ '+data.currency_code+' '+data.landed_local.toLocaleString();
+    localEl.style.display='block';
+  } else {
+    localEl.style.display='none';
+  }
+
+  // Pre-fill alert supplier
+  document.getElementById('alertSupplier').value=data.best_supplier||'';
+
+  document.getElementById('results').classList.add('show');
+}
+
+function renderMap(data){
+  initMap();clearLayers();
+  const destCoords=GEO[data.destination];
+  const all=data.all_suppliers,best=data.best_supplier;
+
+  const bestPerC={};
+  all.forEach(r=>{if(!bestPerC[r.country]||r.landed_cost<bestPerC[r.country].landed_cost)bestPerC[r.country]=r;});
+  const uniq=Object.values(bestPerC);
+
+  // Draw faded routes
+  const drawn=new Set();
+  uniq.forEach(r=>{
+    if(r.country===best||drawn.has(r.country)||!r.route)return;drawn.add(r.country);
+    const c=GEO[r.country];if(!c||!destCoords)return;
+    const hub=r.route.length===3?r.route[1]:null;
+    const segs=hub&&GEO[hub]
+      ?[gcPoints(c[0],c[1],GEO[hub][0],GEO[hub][1]),gcPoints(GEO[hub][0],GEO[hub][1],destCoords[0],destCoords[1])]
+      :[gcPoints(c[0],c[1],destCoords[0],destCoords[1])];
+    segs.forEach(seg=>{layers.push(L.polyline(seg,{color:'#7f8c8d',weight:1.2,opacity:0.35,dashArray:'4 6'}).addTo(map));});
+  });
+
+  // Draw best route
+  const bestData=uniq.find(r=>r.country===best),bc=GEO[best];
+  if(bc&&bestData&&bestData.route&&destCoords){
+    const hub=bestData.route.length===3?bestData.route[1]:null;
+    const segs=hub&&GEO[hub]
+      ?[gcPoints(bc[0],bc[1],GEO[hub][0],GEO[hub][1]),gcPoints(GEO[hub][0],GEO[hub][1],destCoords[0],destCoords[1])]
+      :[gcPoints(bc[0],bc[1],destCoords[0],destCoords[1])];
+    segs.forEach(seg=>{
+      layers.push(L.polyline(seg,{color:'#0d2b45',weight:8,opacity:0.1}).addTo(map));
+      layers.push(L.polyline(seg,{color:'#0d2b45',weight:2.5,opacity:0.9,dashArray:'10 5'}).addTo(map));
+    });
+
+    // Hub marker
+    if(hub&&GEO[hub]){
+      const hm=L.marker(GEO[hub],{icon:makePulseIcon('hub'),zIndexOffset:500}).addTo(map);
+      hm.bindPopup(`<div class="pu"><div class="pu-head"><span class="pu-flag">⚓</span><span class="pu-name">${hub}</span></div><div class="pu-rows"><div class="pu-row"><span class="pu-key">Role</span><span class="pu-val">Transit Hub</span></div></div></div>`);
+      const hl=L.marker(GEO[hub],{icon:L.divIcon({className:'',iconSize:[0,0]})}).addTo(map);
+      hl.bindTooltip(`<div class="map-lbl" style="color:#b45309;font-weight:600;">${hub}<br><span style="font-size:9px;color:#888;font-weight:400">Transit Hub</span></div>`,{permanent:true,direction:'right',offset:[12,0],opacity:1}).openTooltip();
+      layers.push(hm,hl);
+    }
+  }
+
+  // Destination marker
+  if(destCoords){
+    const dm=L.marker(destCoords,{icon:makePulseIcon('dest'),zIndexOffset:2000}).addTo(map);
+    dm.bindPopup(`<div class="pu"><div class="pu-dest-badge">📍 Destination</div><div class="pu-head"><span class="pu-flag">${FLAGS[data.destination]||'🌍'}</span><span class="pu-name">${data.destination}</span></div></div>`);
+    dm.openPopup();
+    const dl=L.marker(destCoords,{icon:L.divIcon({className:'',iconSize:[0,0]})}).addTo(map);
+    dl.bindTooltip(`<div class="map-lbl" style="color:#166534;font-weight:600;">${data.destination}<br><span style="font-size:9px;color:#888;font-weight:400">Destination</span></div>`,{permanent:true,direction:'right',offset:[14,0],opacity:1}).openTooltip();
+    layers.push(dm,dl);
+  }
+
+  // Supplier pulsing dots
+  uniq.forEach(r=>{
+    const c=GEO[r.country];if(!c)return;
+    const isBest=r.country===best;
+    const marker=L.marker(c,{icon:makePulseIcon(isBest?'best':'other'),zIndexOffset:isBest?1000:0}).addTo(map);
+    const badge=isBest?`<div class="pu-badge">★ Best Option</div>`:'';
+    marker.bindPopup(`<div class="pu">${badge}<div class="pu-head"><span class="pu-flag">${FLAGS[r.country]||''}</span><span class="pu-name">${r.country}</span></div><div class="pu-rows"><div class="pu-row"><span class="pu-key">Landed Cost</span><span class="pu-val ${isBest?'best':''}">$${r.landed_cost.toFixed(2)}</span></div><div class="pu-row"><span class="pu-key">Product Cost</span><span class="pu-val">$${r.product_cost}</span></div><div class="pu-row"><span class="pu-key">Shipping</span><span class="pu-val">$${(r.shipping_cost||0).toFixed(2)}</span></div><div class="pu-row"><span class="pu-key">Tariff</span><span class="pu-val">${r.tariff}%</span></div><div class="pu-row"><span class="pu-key">Delivery</span><span class="pu-val">${r.delivery_time} days</span></div><div class="pu-row"><span class="pu-key">Route</span><span class="pu-val">${(r.route||[]).join(' → ')}</span></div></div></div>`,{maxWidth:250});
+    const ldir=c[1]>50?'left':'right',loff=c[1]>50?[-20,0]:[20,0];
+    const lbl=L.marker(c,{icon:L.divIcon({className:'',iconSize:[0,0]})}).addTo(map);
+    lbl.bindTooltip(`<div class="map-lbl" style="font-weight:${isBest?700:400};color:${isBest?'#0d2b45':'#374151'};">${r.country}<br><span style="font-size:9px;color:${isBest?'#1565c0':'#6b7280'};font-weight:400;">$${r.landed_cost.toFixed(0)}</span></div>`,{permanent:true,direction:ldir,offset:loff,opacity:1}).openTooltip();
+    if(isBest)marker.openPopup();
+    layers.push(marker,lbl);
+  });
+
+  // Fit bounds
+  const pts=uniq.map(r=>GEO[r.country]).filter(Boolean);
+  if(destCoords)pts.push(destCoords);
+  if(pts.length>0)map.fitBounds(L.latLngBounds(pts),{padding:[60,60],maxZoom:5});
+}
+</script>
+</body>
+</html>
