@@ -122,25 +122,6 @@ Landed Cost = Product Cost
 
 ---
 
-## 🗺️ Supported Supplier Countries
-
-Brazil · Canada · China · Germany · India · Indonesia · Japan · Malaysia · Mexico · South Korea · Thailand · Vietnam
-
----
-
-## 🌐 Routing Hubs
-
-| Region | Hub |
-|---|---|
-| Europe | Rotterdam |
-| Asia | Singapore |
-| Middle East | Dubai |
-| Africa | Johannesburg |
-| South America | Panama City |
-| North America | Los Angeles |
-| Oceania | Sydney |
-
----
 
 ## 📸 Screenshots
 
