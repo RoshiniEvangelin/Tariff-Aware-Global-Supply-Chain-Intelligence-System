@@ -144,9 +144,11 @@ Brazil · Canada · China · Germany · India · Indonesia · Japan · Malaysia 
 
 ## 📸 Screenshots
 
-> *Add screenshots of your app here*
-> 
-> Tip: Press `Windows + Shift + S` to take a screenshot, then drag it into your GitHub repo
+> <img width="3016" height="1722" alt="image" src="https://github.com/user-attachments/assets/d358ff82-5834-43f2-ae00-3ea5785dee9f" />
+
+> <img width="3024" height="1710" alt="image" src="https://github.com/user-attachments/assets/07d11838-90d5-41bc-9551-09a635cc1ff0" />
+
+
 
 ---
 
